@@ -6,8 +6,8 @@ import ModalMovimientos from "./ModalMovimientos";
 import ToastContainer from "./ToastContainer";
 import "./styles.css";
 
-export default function Dashboard({ logout, usuario }) {
-  const [user, setUser] = useState(usuario || null);
+export default function Dashboard({ userId, logout }) {
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // 🔍 Buscador
@@ -21,30 +21,21 @@ export default function Dashboard({ logout, usuario }) {
   // 🔔 Notificaciones
   const [pendingNotifications, setPendingNotifications] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [showHoverNotif, setShowHoverNotif] = useState(false);
+  const [showHoverNotif, setShowHoverNotif] = useState(false); // Para hover
 
   // Toasts
   const [toasts, setToasts] = useState([]);
 
   // ======================
-  // 👤 Obtener usuario con JWT si no viene por prop
+  // 👤 Usuario
   // ======================
   const fetchData = async () => {
-    if (user) return; // ya tenemos usuario
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No hay token, inicia sesión");
-
-      const res = await api.get("/api/wallet/usuario", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const res = await api.get(`/api/wallet/usuario/${userId}`);
       setUser(res.data);
-    } catch (err) {
-      console.error(err);
+    } catch {
       Swal.fire("Error", "No se pudieron cargar los datos", "error");
-      logout();
     } finally {
       setLoading(false);
     }
@@ -52,25 +43,19 @@ export default function Dashboard({ logout, usuario }) {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [userId]);
 
   // ======================
-  // 🔔 Notificaciones pendientes
+  // 🔔 Notificaciones
   // ======================
   const fetchPendingNotifications = async () => {
     if (!user) return;
     try {
-      const token = localStorage.getItem("token");
-      const res = await api.get(`/api/notificaciones/pendientes/${user.telefono}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setPendingNotifications(res.data || []);
-      setPendingCount((res.data && res.data.length) || 0);
+      const res = await api.get(`/api/notificaciones/pendientes/${user.telefono}`);
+      setPendingNotifications(res.data);
+      setPendingCount(res.data.length);
     } catch (err) {
       console.error("Error notificaciones", err);
-      setPendingNotifications([]);
-      setPendingCount(0);
     }
   };
 
@@ -80,23 +65,16 @@ export default function Dashboard({ logout, usuario }) {
     return () => clearInterval(interval);
   }, [user]);
 
-  // ======================
-  // 🔔 Procesar notificación
-  // ======================
   const handleProcessNotification = async (n) => {
     const esCompra =
       n.tipo === "compra" ||
       n.mensaje.toLowerCase().includes("compra") ||
       n.mensaje.toLowerCase().includes("pago");
 
-    const token = localStorage.getItem("token");
-
     if (esCompra) {
       const result = await Swal.fire({
         title: "🛒 Solicitud de compra",
-        html: `<p>${n.mensaje}</p><strong>Monto: $${Number(
-          n.monto
-        ).toLocaleString()}</strong>`,
+        html: `<p>${n.mensaje}</p><strong>Monto: $${Number(n.monto).toLocaleString()}</strong>`,
         icon: "question",
         showCancelButton: true,
         confirmButtonText: "✅ Aceptar",
@@ -107,15 +85,11 @@ export default function Dashboard({ logout, usuario }) {
 
       if (result.isConfirmed) {
         try {
-          await api.post(
-            "/api/wallet/transferencia",
-            {
-              telefono_origen: user.telefono,
-              telefono_destino: n.telefono_origen,
-              monto: n.monto,
-            },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          await api.post("/api/wallet/transferencia", {
+            telefono_origen: user.telefono,
+            telefono_destino: n.telefono_origen,
+            monto: n.monto,
+          });
           await Swal.fire("✅ Aprobado", "Pago realizado", "success");
         } catch {
           await Swal.fire("Error", "No se pudo procesar", "error");
@@ -128,18 +102,14 @@ export default function Dashboard({ logout, usuario }) {
     }
 
     // Marcar como leída
-    await api.put(
-      `/api/notificaciones/leida/${n.notif_id}`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    await api.put(`/api/notificaciones/leida/${n.notif_id}`);
   };
 
   // ======================
   // 🔍 Buscador Autocomplete
   // ======================
   useEffect(() => {
-    if (!receptorInput || !user) {
+    if (!receptorInput) {
       setReceptorList([]);
       setShowDropdown(false);
       return;
@@ -147,13 +117,8 @@ export default function Dashboard({ logout, usuario }) {
 
     const timeout = setTimeout(async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await api.get(`/api/wallet/buscar/${receptorInput}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const filtrados = (res.data || []).filter(
-          (u) => u.telefono !== user.telefono
-        );
+        const res = await api.get(`/api/wallet/buscar/${receptorInput}`);
+        const filtrados = res.data.filter((u) => u.telefono !== user.telefono);
         setReceptorList(filtrados);
         setShowDropdown(true);
       } catch {
@@ -167,7 +132,7 @@ export default function Dashboard({ logout, usuario }) {
 
   const seleccionarUsuario = (usuario) => {
     setReceptorData(usuario);
-    setReceptorInput(usuario.nombre + " - " + usuario.telefono);
+    setReceptorInput(usuario.telefono);
     setShowDropdown(false);
   };
 
@@ -188,50 +153,33 @@ export default function Dashboard({ logout, usuario }) {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      await api.post("/api/wallet/transferencia", {
+        telefono_origen: user.telefono,
+        telefono_destino: receptorData.telefono,
+        monto: montoFloat,
+      });
 
-      await api.post(
-        "/api/wallet/transferencia",
-        {
-          telefono_origen: user.telefono,
-          telefono_destino: receptorData.telefono,
-          monto: montoFloat,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await api.post(
-        "/api/notificaciones",
-        {
-          telefono_destino: receptorData.telefono,
-          mensaje: `💰 ${user.nombre} te envió $${montoFloat.toLocaleString()}`,
-          monto: montoFloat,
-          tipo: "transferencia",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post("/api/notificaciones", {
+        telefono_destino: receptorData.telefono,
+        mensaje: `💰 ${user.nombre} te envió $${montoFloat.toLocaleString()}`,
+        monto: montoFloat,
+        tipo: "transferencia",
+      });
 
       setToasts((prev) => [
         ...prev,
-        {
-          mensaje: `💰 Enviaste $${montoFloat.toLocaleString()} a ${receptorData.nombre}`,
-        },
+        { mensaje: `💰 Enviaste $${montoFloat.toLocaleString()} a ${receptorData.nombre}` },
       ]);
-      fetchData(); // refresca saldo
+      fetchData();
       setMonto("");
       setReceptorInput("");
       setReceptorData(null);
     } catch (err) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.msg || "Error en la transferencia",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.msg || "Error en la transferencia", "error");
     }
   };
 
-  if (loading || !user)
-    return <p style={{ color: "#fff" }}>Cargando datos de usuario...</p>;
+  if (loading || !user) return <p style={{ color: "#fff" }}>Cargando...</p>;
 
   return (
     <div className="container">
@@ -242,7 +190,7 @@ export default function Dashboard({ logout, usuario }) {
             Hola, <span className="highlight">{user.nombre}</span>
           </h1>
           <p className="subtitle">Saldo disponible</p>
-          <h2 className="saldo">${user.saldo?.toLocaleString() || 0}</h2>
+          <h2 className="saldo">${user.saldo.toLocaleString()}</h2>
           <p style={{ color: "#fff" }}>📞 {user.telefono}</p>
         </div>
 
@@ -271,15 +219,11 @@ export default function Dashboard({ logout, usuario }) {
               {pendingNotifications.length > 0 ? (
                 pendingNotifications.map((n) => (
                   <div key={n.notif_id} className="hover-item">
-                    {n.mensaje.length > 50
-                      ? n.mensaje.slice(0, 50) + "..."
-                      : n.mensaje}
+                    {n.mensaje.length > 50 ? n.mensaje.slice(0, 50) + "..." : n.mensaje}
                   </div>
                 ))
               ) : (
-                <div className="hover-item">
-                  No hay notificaciones pendientes
-                </div>
+                <div className="hover-item">No hay notificaciones pendientes</div>
               )}
             </div>
           )}
@@ -308,11 +252,7 @@ export default function Dashboard({ logout, usuario }) {
             {showDropdown && receptorList.length > 0 && (
               <div className="dropdown">
                 {receptorList.map((u) => (
-                  <div
-                    key={u.user_id}
-                    className="dropdown-item"
-                    onClick={() => seleccionarUsuario(u)}
-                  >
+                  <div key={u.telefono} className="dropdown-item" onClick={() => seleccionarUsuario(u)}>
                     <strong>{u.nombre}</strong>
                     <br />
                     <span>📞 {u.telefono}</span>
@@ -321,29 +261,16 @@ export default function Dashboard({ logout, usuario }) {
               </div>
             )}
           </div>
-          <input
-            type="number"
-            placeholder="Monto"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            className="input"
-          />
+          <input type="number" placeholder="Monto" value={monto} onChange={(e) => setMonto(e.target.value)} className="input" />
         </div>
-        {receptorData && (
-          <p className="receptor-info">
-            ✅ {receptorData.nombre} {receptorData.telefono}
-          </p>
-        )}
+        {receptorData && <p className="receptor-info">✅ {receptorData.nombre} {receptorData.telefono}</p>}
         <button className="send-btn" onClick={enviarDinero}>
           💸 Enviar dinero
         </button>
       </div>
 
       {/* BOTONES */}
-      <button
-        className="mov-btn"
-        onClick={() => setShowModalMovimientos(true)}
-      >
+      <button className="mov-btn" onClick={() => setShowModalMovimientos(true)}>
         Ver movimientos
       </button>
 
@@ -375,16 +302,9 @@ export default function Dashboard({ logout, usuario }) {
           if (!formValues) return;
 
           try {
-            const token = localStorage.getItem("token");
-            await api.put(`/api/wallet/editar/${user.user_id}`, formValues, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            await api.put(`/api/wallet/editar/${userId}`, formValues);
             setUser({ ...user, ...formValues });
-            Swal.fire(
-              "Actualizado!",
-              "Tus datos se actualizaron correctamente",
-              "success"
-            );
+            Swal.fire("Actualizado!", "Tus datos se actualizaron correctamente", "success");
           } catch {
             Swal.fire("Error", "No se pudieron actualizar tus datos", "error");
           }
@@ -393,12 +313,7 @@ export default function Dashboard({ logout, usuario }) {
         ✏️ Editar mis datos
       </button>
 
-      {showModalMovimientos && (
-        <ModalMovimientos
-          telefono={user.telefono}
-          onClose={() => setShowModalMovimientos(false)}
-        />
-      )}
+      {showModalMovimientos && <ModalMovimientos telefono={user.telefono} onClose={() => setShowModalMovimientos(false)} />}
 
       {/* TOASTS */}
       <ToastContainer notifications={toasts} onDone={() => setToasts([])} />

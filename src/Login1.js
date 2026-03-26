@@ -8,6 +8,59 @@ export default function Login({ setToken, setVista, setUsuario }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // const login = async () => {
+  //   if (!telefono || !password) {
+  //     return Swal.fire({
+  //       icon: "warning",
+  //       title: "Campos incompletos",
+  //       text: "Por favor completa todos los campos",
+  //     });
+  //   }
+
+  //   if (!/^\d+$/.test(telefono)) {
+  //     return Swal.fire({
+  //       icon: "warning",
+  //       title: "Teléfono inválido",
+  //       text: "El número de teléfono debe contener solo dígitos",
+  //     });
+  //   }
+
+  //   try {
+  //     setLoading(true);
+
+  //     // 🔑 Llamada al backend
+  //     const res = await api.post("/api/login", { telefono, password });
+
+  //     // Verificar respuesta
+  //     if (!res.data || !res.data.token) {
+  //       throw new Error("Respuesta inválida del servidor");
+  //     }
+
+  //     // Guardar token en App.jsx → habilita Dashboard
+  //     setToken(res.data.token);
+
+  //     // Guardar usuario completo
+  //     setUsuario(res.data);
+
+  //     Swal.fire({
+  //       icon: "success",
+  //       title: `Bienvenido ${res.data.nombre} 🔥`,
+  //       text: `Tu saldo actual es $${res.data.saldo.toLocaleString()}`,
+  //       showConfirmButton: false,
+  //       timer: 2000,
+  //     });
+  //   } catch (error) {
+  //     console.error("Login error:", error.response || error.message);
+  //     Swal.fire({
+  //       icon: "error",
+  //       title: "Error",
+  //       text: error.response?.data?.msg || error.message || "Credenciales incorrectas",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const login = async () => {
     if (!telefono || !password) {
       return Swal.fire({
@@ -30,19 +83,19 @@ export default function Login({ setToken, setVista, setUsuario }) {
 
       console.log("⏳ Enviando login...", { telefono, password });
       const res = await api.post("/api/login", { telefono, password });
+      // console.log("✅ Respuesta del backend:", res.data);
 
       if (!res.data || !res.data.user) {
-        throw new Error("Usuario no encontrado o respuesta inválida");
-      }
-
-      // Guardar token y usuario en App.jsx
-      setToken(res.data.token);
-      setUsuario(res.data.user);
-      console.log("usuario",res.data.user)
+  throw new Error("Usuario no encontrado o respuesta inválida");
+}
+      // setToken(res.data.user_id);
+      // setUsuario(res.data);
+      setToken(res.data.token); // guarda solo el token
+      setUsuario(res.data.user); // guarda solo el objeto user
 
       Swal.fire({
         icon: "success",
-        title: `Bienvenido ${res.data.user.nombre} 🔥`,
+        title: `Bienvenido ${res.data.nombre} 🔥`,
         text: `Tu saldo actual es $${res.data.user.saldo.toLocaleString()}`,
         showConfirmButton: false,
         timer: 2000,

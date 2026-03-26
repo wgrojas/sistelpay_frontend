@@ -9,7 +9,9 @@ export default function ModalMovimientos({ telefono, onClose }) {
   const fetchMovimientos = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/api/wallet/movimientos/${telefono}`);
+      const res = await api.get(`/api/wallet/movimientos/${telefono}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       setMovimientos(res.data);
     } catch (error) {
       Swal.fire("Error", "No se pudieron cargar los movimientos", "error");
@@ -51,18 +53,27 @@ export default function ModalMovimientos({ telefono, onClose }) {
               const tipoTexto = esEmisor ? "Enviado" : "Recibido";
               const flecha = esEmisor ? "→" : "←";
               const counterpartNombre = esEmisor ? mov.receptor : mov.emisor;
-              const counterpartTelefono = esEmisor ? mov.telefono_destino : mov.telefono_origen;
+              const counterpartTelefono = esEmisor
+                ? mov.telefono_destino
+                : mov.telefono_origen;
 
               return (
                 <li
                   key={mov.trans_id}
-                  style={esEmisor ? styles.movimientoEmisor : styles.movimientoReceptor}
+                  style={
+                    esEmisor
+                      ? styles.movimientoEmisor
+                      : styles.movimientoReceptor
+                  }
                 >
                   <div style={styles.movInfo}>
                     <span style={styles.movTipo}>
-                      {tipoTexto} {flecha} {counterpartNombre} ({counterpartTelefono})
+                      {tipoTexto} {flecha} {counterpartNombre} (
+                      {counterpartTelefono})
                     </span>
-                    <span style={styles.movFecha}>{formatearFecha(mov.fecha)}</span>
+                    <span style={styles.movFecha}>
+                      {formatearFecha(mov.fecha)}
+                    </span>
                   </div>
                   <div style={styles.movMonto}>
                     {esEmisor ? "-" : "+"}${mov.monto.toLocaleString()}
@@ -81,7 +92,8 @@ export default function ModalMovimientos({ telefono, onClose }) {
 const styles = {
   overlay: {
     position: "fixed",
-    top: 0, left: 0,
+    top: 0,
+    left: 0,
     width: "100%",
     height: "100%",
     backgroundColor: "rgba(0,0,0,0.7)",

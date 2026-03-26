@@ -10,7 +10,9 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:4000" // tu backend
+  baseURL: "http://localhost:4000", // tu backend
+  timeout: 10000,
+  // baseURL: "http://localhost:4000" // tu backend
 });
 
 export default api;

@@ -61,10 +61,11 @@ export default function Dashboard({ logout, usuario }) {
     if (!user) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await api.get(`/api/notificaciones/pendientes/${user.telefono}`, {
+      const res = await api.get("/api/notificaciones/pendientes", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      // si no hay datos, devolvemos arreglo vacío
       setPendingNotifications(res.data || []);
       setPendingCount((res.data && res.data.length) || 0);
     } catch (err) {
@@ -80,9 +81,6 @@ export default function Dashboard({ logout, usuario }) {
     return () => clearInterval(interval);
   }, [user]);
 
-  // ======================
-  // 🔔 Procesar notificación
-  // ======================
   const handleProcessNotification = async (n) => {
     const esCompra =
       n.tipo === "compra" ||
@@ -151,9 +149,7 @@ export default function Dashboard({ logout, usuario }) {
         const res = await api.get(`/api/wallet/buscar/${receptorInput}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const filtrados = (res.data || []).filter(
-          (u) => u.telefono !== user.telefono
-        );
+        const filtrados = (res.data || []).filter((u) => u.telefono !== user.telefono);
         setReceptorList(filtrados);
         setShowDropdown(true);
       } catch {
@@ -167,7 +163,7 @@ export default function Dashboard({ logout, usuario }) {
 
   const seleccionarUsuario = (usuario) => {
     setReceptorData(usuario);
-    setReceptorInput(usuario.nombre + " - " + usuario.telefono);
+    setReceptorInput(usuario.telefono);
     setShowDropdown(false);
   };
 
@@ -277,9 +273,7 @@ export default function Dashboard({ logout, usuario }) {
                   </div>
                 ))
               ) : (
-                <div className="hover-item">
-                  No hay notificaciones pendientes
-                </div>
+                <div className="hover-item">No hay notificaciones pendientes</div>
               )}
             </div>
           )}
@@ -309,7 +303,7 @@ export default function Dashboard({ logout, usuario }) {
               <div className="dropdown">
                 {receptorList.map((u) => (
                   <div
-                    key={u.user_id}
+                    key={u.telefono}
                     className="dropdown-item"
                     onClick={() => seleccionarUsuario(u)}
                   >
@@ -376,7 +370,7 @@ export default function Dashboard({ logout, usuario }) {
 
           try {
             const token = localStorage.getItem("token");
-            await api.put(`/api/wallet/editar/${user.user_id}`, formValues, {
+            await api.put(`/api/wallet/editar`, formValues, {
               headers: { Authorization: `Bearer ${token}` },
             });
             setUser({ ...user, ...formValues });
