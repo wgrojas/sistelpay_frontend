@@ -1,0 +1,272 @@
+import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import api from "./services/api";
+import ModalMovimientos from "./ModalMovimientos";
+import "./styles.css";
+
+export default function Dashboard({ userId, logout }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 🔍 BUSCADOR PRO
+  const [receptorInput, setReceptorInput] = useState("");
+  const [receptorList, setReceptorList] = useState([]);
+  const [receptorData, setReceptorData] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const [monto, setMonto] = useState("");
+  const [showModalMovimientos, setShowModalMovimientos] = useState(false);
+
+  const [pendingNotifications, setPendingNotifications] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // ===== USUARIO =====
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/api/wallet/usuario/${userId}`);
+      setUser(res.data);
+    } catch {
+      Swal.fire("Error", "No se pudieron cargar los datos", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [userId]);
+
+  // ===== NOTIFICACIONES =====
+  const fetchPendingNotifications = async () => {
+    if (!user) return;
+
+    const res = await api.get(
+      `/api/notificaciones/pendientes/${user.telefono}`
+    );
+
+    setPendingNotifications(res.data);
+    setPendingCount(res.data.length);
+  };
+
+  useEffect(() => {
+    fetchPendingNotifications();
+    const interval = setInterval(fetchPendingNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleShowNotifications = () => {
+    if (!pendingNotifications.length) {
+      return Swal.fire("Info", "Sin notificaciones", "info");
+    }
+
+    pendingNotifications.forEach((n) => {
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: n.mensaje,
+        timer: 3000,
+        showConfirmButton: false,
+      });
+
+      api.put(`/api/notificaciones/leida/${n.notif_id}`);
+    });
+
+    setPendingNotifications([]);
+    setPendingCount(0);
+  };
+
+  // ===== 🔍 BUSCADOR AUTOCOMPLETE =====
+  useEffect(() => {
+    if (!receptorInput || receptorInput.length < 1) {
+      setReceptorList([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/wallet/buscar/${receptorInput}`);
+
+        const filtrados = res.data.filter(
+          (u) => u.telefono !== user.telefono
+        );
+
+        setReceptorList(filtrados);
+        setShowDropdown(true);
+      } catch {
+        setReceptorList([]);
+        setShowDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [receptorInput, user]);
+
+  // 👉 SELECCIONAR USUARIO
+  const seleccionarUsuario = (usuario) => {
+    setReceptorData(usuario);
+    setReceptorInput(usuario.telefono);
+    setShowDropdown(false);
+  };
+
+  // ===== 💸 TRANSFERENCIA =====
+  const enviarDinero = async () => {
+    if (!receptorData || !monto) {
+      return Swal.fire("Error", "Completa los campos", "warning");
+    }
+
+    const montoFloat = parseFloat(monto);
+
+    if (isNaN(montoFloat) || montoFloat <= 0) {
+      return Swal.fire("Error", "Monto inválido", "warning");
+    }
+
+    if (montoFloat > user.saldo) {
+      return Swal.fire("Error", "Saldo insuficiente", "warning");
+    }
+
+    try {
+      await api.post("/api/wallet/transferencia", {
+        telefono_origen: user.telefono,
+        telefono_destino: receptorData.telefono,
+        monto: montoFloat,
+      });
+
+      // 🔔 Notificación
+      await api.post("/api/notificaciones", {
+        telefono_destino: String(receptorData.telefono).trim(),
+        mensaje: `💰 ${user.nombre} ${user.telefono} te envió $${montoFloat.toLocaleString()}`,
+        monto: montoFloat,
+      });
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "💸 Transferencia exitosa",
+        showConfirmButton: false,
+        timer: 2000,
+      });
+
+      fetchData();
+      setMonto("");
+      setReceptorInput("");
+      setReceptorData(null);
+
+    } catch (err) {
+      Swal.fire(
+        "Error",
+        err.response?.data?.msg || "Error en la transferencia",
+        "error"
+      );
+    }
+  };
+
+  if (loading || !user) return <p style={{ color: "#fff" }}>Cargando...</p>;
+
+  return (
+    <div className="container">
+      {/* HEADER */}
+      <header className="header-card">
+        <div>
+          <h1 className="title">
+            Hola, <span className="highlight">{user.nombre}</span>
+          </h1>
+          <p className="subtitle">Saldo disponible</p>
+          <h2 className="saldo">${user.saldo.toLocaleString()}</h2>
+          <p style={{ color: "#fff" }}>📞 {user.telefono}</p>
+        </div>
+
+        <div className="notification-wrapper">
+          <button className="notification-btn" onClick={handleShowNotifications}>
+            🔔
+            {pendingCount > 0 && (
+              <span className="badge">{pendingCount}</span>
+            )}
+          </button>
+        </div>
+
+        <button className="logout-btn" onClick={logout}>
+          Salir
+        </button>
+      </header>
+
+      {/* 💸 ENVIAR DINERO */}
+      <div className="card">
+        <h3 className="card-title">Enviar dinero</h3>
+
+        <div className="form-row">
+
+          {/* 🔍 INPUT CON AUTOCOMPLETE */}
+          <div style={{ position: "relative", width: "100%" }}>
+            <input
+              type="text"
+              placeholder="Nombre o teléfono"
+              value={receptorInput}
+              onChange={(e) => {
+                setReceptorInput(e.target.value);
+                setReceptorData(null);
+              }}
+              className="input"
+            />
+
+            {showDropdown && receptorList.length > 0 && (
+              <div className="dropdown">
+                {receptorList.map((u) => (
+                  <div
+                    key={u.telefono}
+                    className="dropdown-item"
+                    onClick={() => seleccionarUsuario(u)}
+                  >
+                    <strong>{u.nombre}</strong>
+                    <br />
+                    <span>📞 {u.telefono}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <input
+            type="number"
+            placeholder="Monto"
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            className="input"
+          />
+        </div>
+
+        {receptorData && (
+          <p className="receptor-info">
+            ✅ {receptorData.nombre} {receptorData.telefono}
+          </p>
+        )}
+
+        <button className="send-btn" onClick={enviarDinero}>
+          💸 Enviar dinero
+        </button>
+      </div>
+
+      {/* BOTONES */}
+      <button
+        className="mov-btn"
+        onClick={() => setShowModalMovimientos(true)}
+      >
+        Ver movimientos
+      </button>
+
+      <button className="edit-btn">
+        ✏️ Editar mis datos
+      </button>
+
+      {showModalMovimientos && (
+        <ModalMovimientos
+          telefono={user.telefono}
+          onClose={() => setShowModalMovimientos(false)}
+        />
+      )}
+    </div>
+  );
+}
