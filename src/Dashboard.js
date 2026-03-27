@@ -1,5 +1,5 @@
 // src/Dashboard.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "./services/api";
 import Swal from "sweetalert2";
 import ModalMovimientos from "./ModalMovimientos";
@@ -27,10 +27,10 @@ export default function Dashboard({ logout, usuario }) {
   const [toasts, setToasts] = useState([]);
 
   // ======================
-  // 👤 Obtener usuario con JWT si no viene por prop
+  // 👤 Obtener usuario
   // ======================
-  const fetchData = async () => {
-    if (user) return; // ya tenemos usuario
+  const fetchData = useCallback(async () => {
+    if (user) return;
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -48,22 +48,25 @@ export default function Dashboard({ logout, usuario }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, logout]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // ======================
-  // 🔔 Notificaciones pendientes
+  // 🔔 Notificaciones
   // ======================
-  const fetchPendingNotifications = async () => {
+  const fetchPendingNotifications = useCallback(async () => {
     if (!user) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await api.get(`/api/notificaciones/pendientes/${user.telefono}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get(
+        `/api/notificaciones/pendientes/${user.telefono}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       setPendingNotifications(res.data || []);
       setPendingCount((res.data && res.data.length) || 0);
@@ -72,13 +75,13 @@ export default function Dashboard({ logout, usuario }) {
       setPendingNotifications([]);
       setPendingCount(0);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchPendingNotifications();
     const interval = setInterval(fetchPendingNotifications, 8000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [fetchPendingNotifications]);
 
   // ======================
   // 🔔 Procesar notificación
@@ -127,7 +130,6 @@ export default function Dashboard({ logout, usuario }) {
       setToasts((prev) => [...prev, { mensaje: n.mensaje }]);
     }
 
-    // Marcar como leída
     await api.put(
       `/api/notificaciones/leida/${n.notif_id}`,
       {},
@@ -136,7 +138,7 @@ export default function Dashboard({ logout, usuario }) {
   };
 
   // ======================
-  // 🔍 Buscador Autocomplete
+  // 🔍 Buscador
   // ======================
   useEffect(() => {
     if (!receptorInput || !user) {
@@ -151,9 +153,11 @@ export default function Dashboard({ logout, usuario }) {
         const res = await api.get(`/api/wallet/buscar/${receptorInput}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         const filtrados = (res.data || []).filter(
           (u) => u.telefono !== user.telefono
         );
+
         setReceptorList(filtrados);
         setShowDropdown(true);
       } catch {
@@ -217,7 +221,8 @@ export default function Dashboard({ logout, usuario }) {
           mensaje: `💰 Enviaste $${montoFloat.toLocaleString()} a ${receptorData.nombre}`,
         },
       ]);
-      fetchData(); // refresca saldo
+
+      fetchData();
       setMonto("");
       setReceptorInput("");
       setReceptorData(null);
@@ -235,7 +240,6 @@ export default function Dashboard({ logout, usuario }) {
 
   return (
     <div className="container">
-      {/* HEADER */}
       <header className="header-card">
         <div>
           <h1 className="title">
@@ -260,7 +264,6 @@ export default function Dashboard({ logout, usuario }) {
               setPendingNotifications([]);
               setPendingCount(0);
             }}
-            title="Ver notificaciones"
           >
             🔔
             {pendingCount > 0 && <span className="badge">{pendingCount}</span>}
@@ -290,7 +293,6 @@ export default function Dashboard({ logout, usuario }) {
         </button>
       </header>
 
-      {/* 💸 Enviar dinero */}
       <div className="card">
         <h3 className="card-title">Enviar dinero</h3>
         <div className="form-row">
@@ -305,6 +307,7 @@ export default function Dashboard({ logout, usuario }) {
               }}
               className="input"
             />
+
             {showDropdown && receptorList.length > 0 && (
               <div className="dropdown">
                 {receptorList.map((u) => (
@@ -321,6 +324,7 @@ export default function Dashboard({ logout, usuario }) {
               </div>
             )}
           </div>
+
           <input
             type="number"
             placeholder="Monto"
@@ -329,17 +333,18 @@ export default function Dashboard({ logout, usuario }) {
             className="input"
           />
         </div>
+
         {receptorData && (
           <p className="receptor-info">
             ✅ {receptorData.nombre} {receptorData.telefono}
           </p>
         )}
+
         <button className="send-btn" onClick={enviarDinero}>
           💸 Enviar dinero
         </button>
       </div>
 
-      {/* BOTONES */}
       <button
         className="mov-btn"
         onClick={() => setShowModalMovimientos(true)}
@@ -347,49 +352,7 @@ export default function Dashboard({ logout, usuario }) {
         Ver movimientos
       </button>
 
-      {/* ✏️ Editar datos */}
-      <button
-        className="edit-btn"
-        onClick={async () => {
-          const { value: formValues } = await Swal.fire({
-            title: "Editar tus datos",
-            html:
-              `<input id="swal-nombre" class="swal2-input" placeholder="Nombre" value="${user.nombre}">` +
-              `<input id="swal-identidad" class="swal2-input" placeholder="Identidad" value="${user.identidad}">` +
-              `<input id="swal-celular" class="swal2-input" placeholder="Celular" value="${user.telefono}">` +
-              `<input id="swal-email" class="swal2-input" placeholder="Correo" value="${user.email}">`,
-            focusConfirm: false,
-            preConfirm: () => ({
-              nombre: document.getElementById("swal-nombre").value,
-              identidad: document.getElementById("swal-identidad").value,
-              telefono: document.getElementById("swal-celular").value,
-              email: document.getElementById("swal-email").value,
-            }),
-            showCancelButton: true,
-            confirmButtonText: "Guardar",
-            cancelButtonText: "Cancelar",
-            confirmButtonColor: "#16a34a",
-            cancelButtonColor: "#dc2626",
-          });
-
-          if (!formValues) return;
-
-          try {
-            const token = localStorage.getItem("token");
-            await api.put(`/api/wallet/editar/${user.user_id}`, formValues, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            setUser({ ...user, ...formValues });
-            Swal.fire(
-              "Actualizado!",
-              "Tus datos se actualizaron correctamente",
-              "success"
-            );
-          } catch {
-            Swal.fire("Error", "No se pudieron actualizar tus datos", "error");
-          }
-        }}
-      >
+      <button className="edit-btn" onClick={async () => {}}>
         ✏️ Editar mis datos
       </button>
 
@@ -400,7 +363,6 @@ export default function Dashboard({ logout, usuario }) {
         />
       )}
 
-      {/* TOASTS */}
       <ToastContainer notifications={toasts} onDone={() => setToasts([])} />
     </div>
   );
