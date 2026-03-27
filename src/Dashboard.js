@@ -1,5 +1,5 @@
 // src/Dashboard.js
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import api from "./services/api";
 import Swal from "sweetalert2";
 import ModalMovimientos from "./ModalMovimientos";
@@ -29,7 +29,7 @@ export default function Dashboard({ logout, usuario }) {
   // ======================
   // 👤 Obtener usuario con JWT si no viene por prop
   // ======================
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     if (user) return; // ya tenemos usuario
     try {
       setLoading(true);
@@ -48,16 +48,16 @@ export default function Dashboard({ logout, usuario }) {
     } finally {
       setLoading(false);
     }
-  }, [user, logout]);
+  };
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
 
   // ======================
   // 🔔 Notificaciones pendientes
   // ======================
-  const fetchPendingNotifications = useCallback(async () => {
+  const fetchPendingNotifications = async () => {
     if (!user) return;
     try {
       const token = localStorage.getItem("token");
@@ -72,13 +72,13 @@ export default function Dashboard({ logout, usuario }) {
       setPendingNotifications([]);
       setPendingCount(0);
     }
-  }, [user]);
+  };
 
   useEffect(() => {
     fetchPendingNotifications();
     const interval = setInterval(fetchPendingNotifications, 8000);
     return () => clearInterval(interval);
-  }, [fetchPendingNotifications]);
+  }, [user]);
 
   // ======================
   // 🔔 Procesar notificación
@@ -347,6 +347,7 @@ export default function Dashboard({ logout, usuario }) {
         Ver movimientos
       </button>
 
+      {/* ✏️ Editar datos */}
       <button
         className="edit-btn"
         onClick={async () => {

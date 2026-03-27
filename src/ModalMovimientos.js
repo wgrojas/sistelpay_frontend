@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "./services/api";
 import Swal from "sweetalert2";
 
@@ -6,7 +6,10 @@ export default function ModalMovimientos({ telefono, onClose }) {
   const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchMovimientos = async () => {
+  // ✅ useCallback para evitar error de dependencia
+  const fetchMovimientos = useCallback(async () => {
+    if (!telefono) return;
+
     try {
       setLoading(true);
       const res = await api.get(`/api/wallet/movimientos/${telefono}`, {
@@ -18,16 +21,17 @@ export default function ModalMovimientos({ telefono, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (telefono) fetchMovimientos();
   }, [telefono]);
+
+  // ✅ Un solo useEffect correcto
+  useEffect(() => {
+    fetchMovimientos();
+  }, [fetchMovimientos]);
 
   // ================== Formatear fecha y hora AM/PM ==================
   const formatearFecha = (fecha) => {
     const opcionesFecha = { day: "2-digit", month: "short", year: "numeric" };
-    const opcionesHora = { hour: "2-digit", minute: "2-digit", hour12: true }; // AM/PM
+    const opcionesHora = { hour: "2-digit", minute: "2-digit", hour12: true };
     const d = new Date(fecha);
     return `${d.toLocaleDateString("es-CO", opcionesFecha)}, ${d.toLocaleTimeString("es-CO", opcionesHora)}`;
   };
@@ -174,5 +178,5 @@ const styles = {
   },
   movTipo: { fontWeight: "bold" },
   movMonto: { fontWeight: "bold" },
-  movFecha: { fontSize: 12, color: "#ddd", marginTop: 3 }, // fecha en AM/PM
+  movFecha: { fontSize: 12, color: "#ddd", marginTop: 3 },
 };

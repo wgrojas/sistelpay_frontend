@@ -11,7 +11,7 @@ import axios from "axios";
 
 const api = axios.create({
    baseURL: "https://sistelpay-d79dfc670530.herokuapp.com", // tu backend
-  // baseURL: "http://localhost:4000", // tu backend
+//  baseURL: "http://localhost:4000", // tu backend
   timeout: 10000,
  
 });

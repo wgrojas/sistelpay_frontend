@@ -38,6 +38,7 @@ export default function Login({ setToken, setVista, setUsuario }) {
       // Guardar token y usuario en App.jsx
       setToken(res.data.token);
       setUsuario(res.data.user);
+      console.log("token",res.data.token)
       console.log("usuario",res.data.user)
 
       Swal.fire({
