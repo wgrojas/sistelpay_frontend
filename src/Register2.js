@@ -1,8 +1,9 @@
+// Register.jsx
 import { useState } from "react";
 import api from "./services/api";
 import Swal from "sweetalert2";
 
-export default function Register({ setToken, setVista, setUsuario }) {
+export default function Register({ setUserId, setVista, setIdentidad }) {
   const [form, setForm] = useState({
     nombre: "",
     identidad: "",
@@ -23,8 +24,6 @@ export default function Register({ setToken, setVista, setUsuario }) {
   const register = async () => {
     const { nombre, identidad, telefono, email, password } = form;
 
-    console.log("📤 DATOS ENVIADOS:", form);
-
     if (!nombre || !identidad || !telefono || !email || !password) {
       return Swal.fire({
         icon: "warning",
@@ -36,6 +35,7 @@ export default function Register({ setToken, setVista, setUsuario }) {
     try {
       setLoading(true);
 
+      // Enviar datos al backend
       const res = await api.post("/api/register", {
         nombre,
         identidad,
@@ -43,42 +43,19 @@ export default function Register({ setToken, setVista, setUsuario }) {
         email,
         password,
       });
+      console.log(res)
+      Swal.fire({
+        icon: "success",
+        title: "Usuario creado correctamente 🔥",
+        showConfirmButton: false,
+        timer: 1500,
+      });
 
-      console.log("✅ RESPUESTA BACKEND:", res.data);
-
-      // 🔥 CASO 1: Backend con TOKEN (PRO)
-      if (res.data?.token) {
-        console.log("🔐 LOGIN AUTOMÁTICO");
-
-        setToken(res.data.token);
-        setUsuario(res.data.user);
-
-        Swal.fire({
-          icon: "success",
-          title: "Registro exitoso 🚀",
-          text: "Bienvenido a SistelPay",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-
-        return;
-      }
-
-      // 🔥 CASO 2: Backend SIN TOKEN (tu caso actual)
-      if (res.data?.user_id) {
-        console.log("🆔 Usuario creado:", res.data.user_id);
-
-        Swal.fire({
-          icon: "success",
-          title: "Usuario creado correctamente 🔥",
-          text: "Ahora inicia sesión",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-
-        setVista("login"); // 👉 redirigir a login
-      } else {
-        console.warn("⚠️ Respuesta inesperada:", res.data);
+      // Guardar datos para entrar automáticamente al dashboard
+      if (res.data.user_id) {
+        setUserId(res.data.user_id); // ⚡ backend debe enviar "user_id"
+        setIdentidad(res.data.identidad || identidad); // usar la que envía backend o la ingresada
+        setVista("login"); // cambiar vista a dashboard
       }
 
       // Limpiar formulario
@@ -91,22 +68,10 @@ export default function Register({ setToken, setVista, setUsuario }) {
       });
 
     } catch (error) {
-      console.error("❌ ERROR COMPLETO:", error);
-
-      if (error.response) {
-        console.error("📥 BACKEND:", error.response.data);
-        console.error("📊 STATUS:", error.response.status);
-      } else if (error.request) {
-        console.error("📡 SIN RESPUESTA DEL SERVIDOR");
-      }
-
       Swal.fire({
         icon: "error",
-        title: "Error al registrar",
-        text:
-          error.response?.data?.msg ||
-          error.response?.data?.error ||
-          error.message,
+        title: "Error",
+        text: error.response?.data?.msg || "Error al registrar",
       });
     } finally {
       setLoading(false);
@@ -120,14 +85,7 @@ export default function Register({ setToken, setVista, setUsuario }) {
         <p style={styles.subtitle}>Crea tu cuenta 💳</p>
       </div>
 
-      {/* 🔥 FORM CORRECTO */}
-      <form
-        style={styles.card}
-        onSubmit={(e) => {
-          e.preventDefault();
-          register();
-        }}
-      >
+      <div style={styles.card}>
         <h2 style={styles.title}>Registrarse</h2>
 
         <input
@@ -171,18 +129,14 @@ export default function Register({ setToken, setVista, setUsuario }) {
           onChange={handleChange}
         />
 
-        <button type="submit" style={styles.button} disabled={loading}>
+        <button style={styles.button} onClick={register}>
           {loading ? "Creando..." : "Crear cuenta"}
         </button>
 
-        <button
-          type="button"
-          style={styles.backButton}
-          onClick={() => setVista("login")}
-        >
+        <button style={styles.backButton} onClick={() => setVista("login")}>
           Volver al login
         </button>
-      </form>
+      </div>
 
       <p style={styles.footer}>🔐 Tus datos están protegidos</p>
     </div>

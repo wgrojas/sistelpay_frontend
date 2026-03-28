@@ -352,10 +352,51 @@ export default function Dashboard({ logout, usuario }) {
         Ver movimientos
       </button>
 
-      <button className="edit-btn" onClick={async () => {}}>
+   {/* ✏️ Editar datos */}
+      <button
+        className="edit-btn"
+        onClick={async () => {
+          const { value: formValues } = await Swal.fire({
+            title: "Editar tus datos",
+            html:
+              `<input id="swal-nombre" class="swal2-input" placeholder="Nombre" value="${user.nombre}">` +
+              `<input id="swal-identidad" class="swal2-input" placeholder="Identidad" value="${user.identidad}">` +
+              `<input id="swal-celular" class="swal2-input" placeholder="Celular" value="${user.telefono}">` +
+              `<input id="swal-email" class="swal2-input" placeholder="Correo" value="${user.email}">`,
+            focusConfirm: false,
+            preConfirm: () => ({
+              nombre: document.getElementById("swal-nombre").value,
+              identidad: document.getElementById("swal-identidad").value,
+              telefono: document.getElementById("swal-celular").value,
+              email: document.getElementById("swal-email").value,
+            }),
+            showCancelButton: true,
+            confirmButtonText: "Guardar",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#16a34a",
+            cancelButtonColor: "#dc2626",
+          });
+
+          if (!formValues) return;
+
+          try {
+            const token = localStorage.getItem("token");
+            await api.put(`/api/wallet/editar/${user.user_id}`, formValues, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            setUser({ ...user, ...formValues });
+            Swal.fire(
+              "Actualizado!",
+              "Tus datos se actualizaron correctamente",
+              "success"
+            );
+          } catch {
+            Swal.fire("Error", "No se pudieron actualizar tus datos", "error");
+          }
+        }}
+      >
         ✏️ Editar mis datos
       </button>
-
       {showModalMovimientos && (
         <ModalMovimientos
           telefono={user.telefono}
